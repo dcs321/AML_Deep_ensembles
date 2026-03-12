@@ -13,9 +13,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
     parser.add_argument('--run_name', type=str, default='ensemble_run', help='Name of the wandb run.')
-    parser.add_argument('--classification_or_regression', type=str, default='regression', help='Regression or classification.')
+    parser.add_argument('--classification_or_regression', type=str, default='classification', help='Regression or classification.')
     parser.add_argument('--dataset', type=str, default='mnist', help='Dataset to use.')
     parser.add_argument('--number_of_models', type=int, default=5, help='Number of models in the ensemble.')
+    parser.add_argument('--number_of_steps', type=int, default=5, help='Number of inference steps just for MC Dropout.')
     parser.add_argument('--with_validation_set', action='store_true', default=False, help='Whether to use validation set or not.')
     parser.add_argument('--perform_ensemble_experiment', action='store_true', help='Whether to perform ensemble experiment or not.')
     parser.add_argument('--perform_mc_dropout_experiment', action='store_true', help='Whether to perform MC Dropout experiment or not.')
@@ -131,7 +132,7 @@ def main():
                 wandb.log({f'Test Loss for Dropout model': dropout_test_loss.item()})
 
             print("MC Dropout experiment started")
-            for i in range(1, args.number_of_models + 1):
+            for i in range(1, args.number_of_steps + 1):
                 dropout_predictions, dropout_targets = get_predictions_and_targets_mc_dropout(dropout_model, test_loader, device, i)
                 
                 dropout_nll = compute_negative_log_likelihood(dropout_predictions, dropout_targets)
