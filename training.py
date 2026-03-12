@@ -2,11 +2,12 @@
 import torch
 import wandb
 
-def training_loop(model, train_loader, optimizer, criterion, num_of_epochs, wandb_enabled=False, val_loader=None, model_save_path="models/model.pt"):
+def training_loop(model, train_loader, optimizer, criterion, num_of_epochs, device, wandb_enabled=False, val_loader=None, model_save_path="models/model.pt"):
     for epoch in range(num_of_epochs):
         model.train()
         train_loss = 0
         for batch_x, batch_y  in train_loader:
+            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             optimizer.zero_grad()
             output = model(batch_x)
             loss = criterion(output, batch_y)
@@ -21,6 +22,7 @@ def training_loop(model, train_loader, optimizer, criterion, num_of_epochs, wand
             val_loss = 0
             with torch.no_grad():
                 for batch_x, batch_y  in val_loader:
+                    batch_x, batch_y = batch_x.to(device), batch_y.to(device)
                     output = model(batch_x)
                     loss = criterion(output, batch_y)
                     val_loss += loss.item()

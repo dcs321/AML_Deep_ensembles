@@ -2,10 +2,10 @@
 import argparse
 import torch
 
-from models import ClassificationModel, ClassificationEnsemble
-from data import load_mnist
+from models import ClassificationModel, ClassificationEnsemble, ClassificationMCDropoutModel, RegressionModel, RegressionEnsemble
+from data import load_mnist, load_boston_housing
 from training import training_loop
-from evaluation import get_predictions_and_targets, compute_negative_log_likelihood, compute_brier_score, compute_classification_error
+from evaluation import get_predictions_and_targets, compute_negative_log_likelihood, compute_brier_score, compute_classification_error, get_predictions_and_targets_mc_dropout, nll_criterion_regression
 
 import wandb
 
@@ -13,13 +13,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
     parser.add_argument('--run_name', type=str, default='ensemble_run', help='Name of the wandb run.')
-    parser.add_argument('--classification_or_regresssion', type=str, default='regression', help='Regression or classification.')
+    parser.add_argument('--classification_or_regression', type=str, default='regression', help='Regression or classification.')
     parser.add_argument('--dataset', type=str, default='mnist', help='Dataset to use.')
     parser.add_argument('--number_of_models', type=int, default=5, help='Number of models in the ensemble.')
     parser.add_argument('--with_validation_set', action='store_true', default=False, help='Whether to use validation set or not.')
     parser.add_argument('--perform_ensemble_experiment', action='store_true', help='Whether to perform ensemble experiment or not.')
+    parser.add_argument('--perform_mc_dropout_experiment', action='store_true', help='Whether to perform MC Dropout experiment or not.')
 
-    args = parser.parse_args() 
+    args = parser.parse_args()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if args.wandb:
         wandb.init(name=args.run_name, config=vars(args), save_code=True)
@@ -27,58 +29,74 @@ def main():
  
 
     OPTIMIZER = torch.optim.Adam
-    if args.classification_or_regresssion == "classification":
-        LEARNING_RATE = 0.1
+    LEARNING_RATE = 0.1
+
+    if args.classification_or_regression == "classification": #CLASSIFICATION
         NUMBER_OF_EPOCHS = 10
         CRITERION = torch.nn.CrossEntropyLoss()
 
         MODEL = ClassificationModel
+
+        hidden_dims = 200
+        num_of_hidden_layers = 3
+
         if args.dataset == "mnist":
+            input_dims = 784
+            output_dims = 10
             train_loader, val_loader, test_loader = load_mnist(with_validation_set=args.with_validation_set)
         else:
             raise ValueError(f"Dataset {args.dataset} is not supported for classification.")
-    elif args.classification_or_regresssion == "regression":
-        raise NotImplementedError("Regression need to be added here.")
+    elif args.classification_or_regression == "regression": #REGRESSION
+        NUMBER_OF_EPOCHS = 40
+        CRITERION = nll_criterion_regression
+
+        MODEL = RegressionModel
+        
+        hidden_dims = 50
+        output_dims = 1
+        num_of_hidden_layers = 1
+
+        num_of_train_test_splits = 20
+        train_ratio_in_split = 0.9
+
+        if args.dataset == "boston_housing":
+            input_dims = 13
+            #train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_boston_housing(num_of_train_test_splits, train_ratio_in_split) TODO - Implement load_boston_housing function
+        assert output_dims == 1, "Only 1-dimension output is supported for regression"
     else:
         raise ValueError("Only classification and regression are supported.")
     
-    models_in_ensemble = []
-    for i in range(args.number_of_models):
-        model = MODEL()
-        optimizer = OPTIMIZER(model.parameters(), lr=LEARNING_RATE)
+    print("Dataset:", args.dataset)
 
-        print(f"Training ensemble model {i+1}.")
-        model = training_loop(model, train_loader, optimizer, CRITERION, NUMBER_OF_EPOCHS, args.wandb, val_loader=val_loader, model_save_path=f"models/model_{args.dataset}_{i+1}.pt")
-        
-        print(f"Evaluating ensemble model {i+1}.")
-        model.eval()
-        test_predictions, test_targets = get_predictions_and_targets(model, test_loader)
-        test_loss = CRITERION(test_predictions, test_targets)
-        print(f"Test loss for model {i+1}: {test_loss.item()}")
-        if args.wandb:
-            wandb.log({f'Test Loss for model {i+1}': test_loss.item()})
-        models_in_ensemble.append(model)
+    if args.classification_or_regression == "classification": #CLASSIFICATION
+        models_in_ensemble = []
+        for i in range(args.number_of_models):
+            model = MODEL(input_dims, hidden_dims, output_dims, num_of_hidden_layers).to(device)
+            optimizer = OPTIMIZER(model.parameters(), lr=LEARNING_RATE)
 
-    
-    if args.classification_or_regresssion == "classification":
+            print(f"Training ensemble model {i+1}.")
+            model = training_loop(model, train_loader, optimizer, CRITERION, NUMBER_OF_EPOCHS, device, args.wandb, val_loader=val_loader, model_save_path=f"models/{args.classification_or_regression}/{args.dataset}/model_{args.dataset}_{i+1}.pt")
+            
+            print(f"Evaluating ensemble model {i+1}.")
+            model.eval()
+            test_predictions, test_targets = get_predictions_and_targets(model, test_loader, device)
+            test_loss = CRITERION(test_predictions, test_targets)
+            print(f"Test loss for model {i+1}: {test_loss.item()}")
+            if args.wandb:
+                wandb.log({f'Test Loss for model {i+1}': test_loss.item()})
+            models_in_ensemble.append(model)
 
         ensemble_model = ClassificationEnsemble(models_in_ensemble)
         ensemble_model.eval()
 
-        ensemble_predictions, ensemble_targets = get_predictions_and_targets(ensemble_model, test_loader)
+        ensemble_predictions, ensemble_targets = get_predictions_and_targets(ensemble_model, test_loader, device)
         
-        ensemble_test_loss = CRITERION(ensemble_predictions, ensemble_targets)
-        ensemble_brier_score = compute_brier_score(ensemble_predictions, ensemble_targets)
-        ensemble_classification_error = compute_classification_error(ensemble_predictions, ensemble_targets)
+        ensemble_test_loss_nll = compute_negative_log_likelihood(ensemble_predictions, ensemble_targets)
         
-        print(f"Test loss (NLL) for final ensemble: {ensemble_test_loss.item()}")
-        print(f"Brier score for final ensemble: {ensemble_brier_score}")
-        print(f"Classification for final ensemble: {ensemble_classification_error}")
+        print(f"Test loss (NLL) for final ensemble: {ensemble_test_loss_nll}")
         
         if args.wandb:
-            wandb.log({f'Final Ensemble NLL': ensemble_test_loss.item()})
-            wandb.log({f'Final Ensemble Brier Score': ensemble_brier_score})
-            wandb.log({f'Final Ensemble Classification Error': ensemble_classification_error})
+            wandb.log({f"Test loss (NLL) for final ensemble": ensemble_test_loss_nll})
 
         if args.perform_ensemble_experiment:
             print("Ensemble experiment started")
@@ -86,7 +104,7 @@ def main():
                 ensemble_model = ClassificationEnsemble(models_in_ensemble[:i])
                 ensemble_model.eval()
                 
-                ensemble_predictions, ensemble_targets = get_predictions_and_targets(ensemble_model, test_loader)
+                ensemble_predictions, ensemble_targets = get_predictions_and_targets(ensemble_model, test_loader, device)
                 
                 ensemble_nll = compute_negative_log_likelihood(ensemble_predictions, ensemble_targets)
                 ensemble_classification_error = compute_classification_error(ensemble_predictions, ensemble_targets)
@@ -98,9 +116,58 @@ def main():
 
                 if args.wandb:
                     wandb.log({f'Ensemble NLL': ensemble_nll, 'Ensemble Classification Error': ensemble_classification_error, 'Ensemble Brier Score': ensemble_brier_score})
+        if args.perform_mc_dropout_experiment:
+            print("MC Dropout training started")
+            dropout_rate = 0.1
+            dropout_model = ClassificationMCDropoutModel(input_dims, hidden_dims, output_dims, num_of_hidden_layers, dropout_rate).to(device)
+            dropout_optimizer = OPTIMIZER(dropout_model.parameters(), lr=LEARNING_RATE)
+            dropout_model = training_loop(dropout_model, train_loader, dropout_optimizer, CRITERION, NUMBER_OF_EPOCHS, device, args.wandb, val_loader=val_loader, model_save_path=f"models/{args.classification_or_regression}/{args.dataset}/model_{args.dataset}_mc_dropout.pt")
 
-    else:
-        pass
+            dropout_model.eval()
+            dropout_test_predictions, dropout_test_targets = get_predictions_and_targets(dropout_model, test_loader, device)
+            dropout_test_loss = CRITERION(dropout_test_predictions, dropout_test_targets)
+            print(f"Test loss for Dropout model: {dropout_test_loss.item()}")
+            if args.wandb:
+                wandb.log({f'Test Loss for Dropout model': dropout_test_loss.item()})
+
+            print("MC Dropout experiment started")
+            for i in range(1, args.number_of_models + 1):
+                dropout_predictions, dropout_targets = get_predictions_and_targets_mc_dropout(dropout_model, test_loader, device, i)
+                
+                dropout_nll = compute_negative_log_likelihood(dropout_predictions, dropout_targets)
+                dropout_classification_error = compute_classification_error(dropout_predictions, dropout_targets)
+                dropout_brier_score = compute_brier_score(dropout_predictions, dropout_targets)
+
+                print(f"{i}-Model Dropout NLL: {dropout_nll})")
+                print(f"{i}-Model Dropout Classification Error: {dropout_classification_error}")
+                print(f"{i}-Model Dropout Brier Score: {dropout_brier_score}")
+
+                if args.wandb:
+                    wandb.log({f'Dropout NLL': dropout_nll, 'Dropout Classification Error': dropout_classification_error, 'Dropout Brier Score': dropout_brier_score})
+
+    elif args.classification_or_regression == "regression": #REGRESSION
+        rmse_results = []
+        nll_results = []
+        for i in range(num_of_train_test_splits):
+            models_in_ensemble = []
+            for j in range(args.number_of_models):
+                model = MODEL(input_dims, hidden_dims, output_dims, num_of_hidden_layers).to(device)
+                optimizer = OPTIMIZER(model.parameters(), lr=LEARNING_RATE)
+
+                print(f"Training ensemble model {j+1} on split {i+1}.")
+                model = training_loop(model, train_loaders[i], optimizer, CRITERION, NUMBER_OF_EPOCHS, device, args.wandb, val_loader=None, model_save_path=f"models/{args.classification_or_regression}/{args.dataset}/model_{args.dataset}_split_{i+1}_model_{j+1}.pt")
+                
+                model.eval()
+                models_in_ensemble.append(model)
+        
+            ensemble_model = RegressionEnsemble(models_in_ensemble)
+            ensemble_model.eval()
+
+            #test_predictions, test_targets = get_predictions_and_targets_rescaled(ensemble_model, test_loaders[i], output_means_for_standardization[i], output_stds_for_standardization[i], device) TODO - Implement get_predictions_and_targets_rescaled function
+            #RMSE and NLL computation TODO
+        
+        #compute mean and std of RMSE and NLL across splits for the table TODO
+                
 
 
 if __name__ == "__main__":

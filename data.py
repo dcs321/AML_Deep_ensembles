@@ -3,6 +3,8 @@ import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
+#CLASSIFICATION
+
 def load_mnist(batch_size=100, download=True, with_validation_set=False):
     transformation = transforms.Compose([
         transforms.ToTensor()
@@ -25,3 +27,9 @@ def load_mnist(batch_size=100, download=True, with_validation_set=False):
         return train_loader, val_loader, test_loader
     
     return train_loader, None, test_loader
+
+
+#REGRESSION
+
+def load_boston_housing(num_of_train_test_splits, train_ratio_in_split):
+    pass # TODO
