@@ -36,6 +36,8 @@ And then source it:
 source .env
 ```
 
+Alternatively, if you would like to run the code in Jupyter Notebook, use [`AML_base_notebook.ipynb`](AML_base_notebook.ipynb).
+
 ## Classification
 
 Train a deep ensemble of classifiers on MNIST:
