@@ -29,6 +29,19 @@ def load_mnist(batch_size=100, download=True, with_validation_set=False):
     return train_loader, None, test_loader
 
 
+def load_notmnist(batch_size=100, root='./datasets/classification/notMNIST_small'):
+    transformation = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),
+        transforms.Resize((28, 28)),
+        transforms.ToTensor()
+    ])
+
+    dataset = datasets.ImageFolder(root=root, transform=transformation)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+    return loader
+
+
 #REGRESSION
 
 def load_boston_housing(num_of_train_test_splits, train_ratio_in_split):
