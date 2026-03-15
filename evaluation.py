@@ -61,6 +61,17 @@ def compute_brier_score(probabilities, targets):
     brier_score = torch.mean((probabilities - one_hot_encoded_targets) ** 2)
     return brier_score.item()
 
+def logits_to_probabilities(logits):
+    return F.softmax(logits, dim=1)
+
+def compute_predictive_entropy(probabilities):
+    return -(probabilities * torch.log(probabilities + 1e-9)).sum(dim=1)
+
+def compute_confidence(probabilities):
+    return probabilities.max(dim=1).values
+
+
+
 #REGRESSION
 
 def nll_criterion_regression(predictions, targets):

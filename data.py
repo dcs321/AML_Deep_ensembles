@@ -3,6 +3,9 @@ import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
+
+from PIL import Image, UnidentifiedImageError
+
 #CLASSIFICATION
 
 def load_mnist(batch_size=100, download=True, with_validation_set=False):
@@ -37,6 +40,23 @@ def load_notmnist(batch_size=100, root='./datasets/classification/notMNIST_small
     ])
 
     dataset = datasets.ImageFolder(root=root, transform=transformation)
+
+    # skip invalid/corrupted images
+    valid_samples = []
+    removed = 0
+    for path, label in dataset.samples:
+        try:
+            with Image.open(path) as img:
+                img.verify()
+            valid_samples.append((path, label))
+        except (UnidentifiedImageError, OSError, ValueError):
+            removed += 1
+
+    dataset.samples = valid_samples
+    dataset.imgs = valid_samples
+
+    print(f"Removed {removed} corrupted images from NotMNIST")
+
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     return loader
