@@ -28,6 +28,8 @@ def get_mnist_checkpoint_paths():
     mc_dropout_path = "models/classification/mnist/model_mnist_mc_dropout.pt"
     return ensemble_paths, mc_dropout_path
 
+# Figure 3
+
 def compute_entropy_comparison_results(
     mnist_test_loader,
     notmnist_loader,
@@ -38,7 +40,7 @@ def compute_entropy_comparison_results(
 
     experiment_results = {}
 
-    # Deep Ensembles
+    # ---------- Ensembles ----------
     for M in ensemble_sizes:
         print(f"Running Ensemble M={M}")
         ensemble_model = load_saved_ensemble(ensemble_paths[:M], device)
@@ -56,7 +58,7 @@ def compute_entropy_comparison_results(
             "notmnist_mean": notmnist_entropy.mean().item(),
         }
 
-    # MC Dropout
+    # ---------- MC Dropout ----------
     mc_model = load_saved_model(mc_dropout_path, device)
 
     for M in ensemble_sizes:
@@ -79,3 +81,85 @@ def compute_entropy_comparison_results(
         }
 
     return experiment_results
+
+# Figure 6 
+
+def compute_accuracy_vs_confidence_curve(probabilities, targets, thresholds):
+
+    confidences = probabilities.max(dim=1).values
+    predictions = probabilities.argmax(dim=1)
+
+    accuracies = []
+    coverages = []
+
+    for tau in thresholds:
+        mask = confidences >= tau
+
+        if mask.sum().item() == 0:
+            accuracies.append(float("nan"))
+            coverages.append(0.0)
+        else:
+            correct = (predictions[mask] == targets[mask]).float().mean().item()
+            accuracies.append(correct * 100.0)   # percentage, like paper
+            coverages.append(mask.float().mean().item())
+
+    return {
+        "thresholds": list(thresholds),
+        "accuracies": accuracies,
+        "coverages": coverages,
+    }
+
+def compute_confidence_comparison_results(
+    mnist_test_loader,
+    notmnist_loader,
+    device,
+    thresholds=None,
+    ensemble_size=10,
+):
+
+    if thresholds is None:
+        thresholds = [round(x, 1) for x in torch.arange(0.0, 1.0, 0.1).tolist()]
+
+    ensemble_paths, mc_dropout_path = get_mnist_checkpoint_paths()
+
+    experiment_results = {}
+
+    # ---------- Ensembles ----------
+    ensemble_model = load_saved_ensemble(ensemble_paths[:ensemble_size], device)
+
+    mnist_probs, mnist_targets = get_predictions_and_targets(ensemble_model, mnist_test_loader, device)
+    notmnist_probs, notmnist_targets = get_predictions_and_targets(ensemble_model, notmnist_loader, device)
+
+    mixed_probs = torch.cat([mnist_probs.cpu(), notmnist_probs.cpu()], dim=0)
+    mixed_targets = torch.cat(
+        [mnist_targets.cpu(), torch.full_like(notmnist_targets.cpu(), -1)],
+        dim=0
+    )
+
+    experiment_results["ensemble"] = compute_accuracy_vs_confidence_curve(
+        mixed_probs, mixed_targets, thresholds
+    )
+
+    # ---------- MC Dropout ----------
+    mc_model = load_saved_model(mc_dropout_path, device)
+
+    mnist_probs_mc, mnist_targets_mc = get_predictions_and_targets_mc_dropout(
+        mc_model, mnist_test_loader, device, ensemble_size
+    )
+    notmnist_probs_mc, notmnist_targets_mc = get_predictions_and_targets_mc_dropout(
+        mc_model, notmnist_loader, device, ensemble_size
+    )
+
+    mixed_probs_mc = torch.cat([mnist_probs_mc.cpu(), notmnist_probs_mc.cpu()], dim=0)
+    mixed_targets_mc = torch.cat(
+        [mnist_targets_mc.cpu(), torch.full_like(notmnist_targets_mc.cpu(), -1)],
+        dim=0
+    )
+
+    experiment_results["mc_dropout"] = compute_accuracy_vs_confidence_curve(
+        mixed_probs_mc, mixed_targets_mc, thresholds
+    )
+
+    return experiment_results
+
+

@@ -14,7 +14,7 @@ def smooth_hist_line(values, bins=60, value_range=(-0.5, 2.1), smooth=False):
 
     return centers, hist
 
-
+# Figure 3
 def plot_entropy_comparison(experiment_results, ensemble_sizes=(1, 5, 10),
   save_path="plots/figure3_style_partial_replication.png"):
 
@@ -106,3 +106,41 @@ def plot_entropy_comparison(experiment_results, ensemble_sizes=(1, 5, 10),
     plt.tight_layout()
     plt.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.show()
+
+# Figure 6
+def plot_accuracy_vs_confidence(
+    experiment_results,
+    save_path="plots/figure6_accuracy_vs_confidence.png",
+):
+    fig, ax = plt.subplots(figsize=(7, 5))
+
+    ax.plot(
+        experiment_results["ensemble"]["thresholds"],
+        experiment_results["ensemble"]["accuracies"],
+        marker="o",
+        linewidth=2,
+        markersize=4,
+        label="Ensemble",
+        color="red",
+    )
+
+    ax.plot(
+        experiment_results["mc_dropout"]["thresholds"],
+        experiment_results["mc_dropout"]["accuracies"],
+        marker="o",
+        linewidth=2,
+        markersize=4,
+        label="MC dropout",
+        color="limegreen",
+    )
+
+    ax.set_xlabel(r"Confidence Threshold $\tau$")
+    ax.set_ylabel(r"Accuracy on examples $p(y|x) \geq \tau$")
+    ax.set_xlim(0.0, 0.9)
+    ax.set_ylim(30, 90)
+    ax.legend(frameon=False, loc="upper left")
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=200, bbox_inches="tight")
+    plt.show()
+
