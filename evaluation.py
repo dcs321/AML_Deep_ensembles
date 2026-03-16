@@ -1,4 +1,5 @@
 # Evaluation metrics and functions
+import math
 import torch
 from torch.nn import functional as F
 from torch.nn import CrossEntropyLoss
@@ -76,8 +77,40 @@ def compute_confidence(probabilities):
 
 def nll_criterion_regression(predictions, targets):
     means, variances = predictions
+    means = means.squeeze(1)      
+    variances = variances.squeeze(1) #Added to match targets
     return torch.mean( torch.log(variances)/2 + (targets - means)**2 / (2 * variances) ) 
 
 
 def get_predictions_and_targets_rescaled(model, test_loader, output_mean, output_std, device):
-    pass # TODO
+    model.eval()
+    all_means = []
+    all_variances = []
+    all_targets = []
+
+    with torch.no_grad():
+        for batch_x, batch_y in test_loader:
+            mean_norm, var_norm = model(batch_x.to(device))
+            all_means.append(mean_norm.cpu())
+            all_variances.append(var_norm.cpu())
+            all_targets.append(batch_y.cpu())
+
+    means_norm = torch.cat(all_means, dim=0).squeeze(1) 
+    variances_norm = torch.cat(all_variances, dim=0).squeeze(1)
+    targets_norm = torch.cat(all_targets, dim=0)             
+
+    means_orig = means_norm * output_std + output_mean
+    variances_orig = variances_norm * (output_std ** 2)
+    targets_orig = targets_norm * output_std + output_mean
+
+    return (means_orig, variances_orig), targets_orig
+
+
+def compute_rmse_regression(predictions, targets):
+    means, _ = predictions
+    return torch.sqrt(torch.mean((means - targets) ** 2)).item()
+
+
+def compute_nll_regression(predictions, targets):
+    means, variances = predictions
+    return torch.mean(torch.log(variances) / 2 + (targets - means) ** 2 / (2 * variances)).item() + math.log(2 * math.pi) / 2
