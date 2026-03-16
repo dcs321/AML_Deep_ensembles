@@ -1,7 +1,9 @@
 # Data loading and preprocessing
 import torch
+import numpy as np
+import pandas as pd
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 
 from PIL import Image, UnidentifiedImageError
@@ -64,5 +66,40 @@ def load_notmnist(batch_size=100, root='./datasets/classification/notMNIST_small
 
 #REGRESSION
 
-def load_boston_housing(num_of_train_test_splits, train_ratio_in_split):
-    pass # TODO
+def load_boston_housing(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    # TODO
+    data_url = "http://lib.stat.cmu.edu/datasets/boston"
+    raw_df = pd.read_csv(data_url, sep=r"\s+", skiprows=22, header=None)
+    X = np.hstack([raw_df.values[::2, :], raw_df.values[1::2, :2]])
+    y = raw_df.values[1::2, 2]
+
+    n_samples = len(X)
+    rng = np.random.RandomState(42)
+    n_train   = int(np.floor(train_ratio_in_split * n_samples))
+    train_loaders = [] 
+    test_loaders = [] 
+    output_means = [] 
+    output_stds = []
+
+    for _ in range(num_of_train_test_splits):
+        perm      = rng.permutation(n_samples)
+        train_idx = perm[:n_train]
+        test_idx  = perm[n_train:]
+
+        X_train, X_test = X[train_idx], X[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+
+        X_mean, X_std = X_train.mean(axis=0), X_train.std(axis=0)
+        X_train_n = ((X_train - X_mean) / (X_std + 1e-8)).astype(np.float32)
+        X_test_n  = ((X_test  - X_mean) / (X_std + 1e-8)).astype(np.float32)
+
+        y_mean, y_std = float(y_train.mean()), float(y_train.std())
+        y_train_n = ((y_train - y_mean) / y_std).astype(np.float32)
+        y_test_n  = ((y_test  - y_mean) / y_std).astype(np.float32)
+
+        train_loaders.append(DataLoader(TensorDataset(torch.from_numpy(X_train_n), torch.from_numpy(y_train_n)), batch_size=batch_size, shuffle=True))
+        test_loaders.append( DataLoader(TensorDataset(torch.from_numpy(X_test_n),  torch.from_numpy(y_test_n)),  batch_size=batch_size, shuffle=False))
+        output_means.append(y_mean)
+        output_stds.append(y_std)
+
+    return train_loaders, test_loaders, output_means, output_stds
