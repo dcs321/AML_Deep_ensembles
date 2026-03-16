@@ -1,11 +1,12 @@
 # Run training and evaluation
 import argparse
 import torch
+import numpy as np
 
 from models import ClassificationModel, ClassificationEnsemble, ClassificationMCDropoutModel, RegressionModel, RegressionEnsemble
 from data import load_mnist, load_boston_housing
 from training import training_loop
-from evaluation import get_predictions_and_targets, compute_negative_log_likelihood, compute_brier_score, compute_classification_error, get_predictions_and_targets_mc_dropout, nll_criterion_regression
+from evaluation import get_predictions_and_targets, compute_negative_log_likelihood, compute_brier_score, compute_classification_error, get_predictions_and_targets_mc_dropout, nll_criterion_regression, get_predictions_and_targets_rescaled, compute_rmse_regression, compute_nll_regression
 
 import wandb
 
@@ -50,7 +51,7 @@ def main():
     elif args.classification_or_regression == "regression": #REGRESSION
         NUMBER_OF_EPOCHS = 40
         CRITERION = nll_criterion_regression
-
+        LEARNING_RATE = 0.01
         MODEL = RegressionModel
         
         hidden_dims = 50
@@ -62,7 +63,7 @@ def main():
 
         if args.dataset == "boston_housing":
             input_dims = 13
-            #train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_boston_housing(num_of_train_test_splits, train_ratio_in_split) TODO - Implement load_boston_housing function
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_boston_housing(num_of_train_test_splits, train_ratio_in_split)
         assert output_dims == 1, "Only 1-dimension output is supported for regression"
     else:
         raise ValueError("Only classification and regression are supported.")
@@ -164,11 +165,27 @@ def main():
             ensemble_model = RegressionEnsemble(models_in_ensemble)
             ensemble_model.eval()
 
-            #test_predictions, test_targets = get_predictions_and_targets_rescaled(ensemble_model, test_loaders[i], output_means_for_standardization[i], output_stds_for_standardization[i], device) TODO - Implement get_predictions_and_targets_rescaled function
-            #RMSE and NLL computation TODO
+            test_predictions, test_targets = get_predictions_and_targets_rescaled(ensemble_model, test_loaders[i], output_means_for_standardization[i], output_stds_for_standardization[i], device)
+            #RMSE and NLL computation
+            split_rmse = compute_rmse_regression(test_predictions, test_targets)
+            split_nll  = compute_nll_regression(test_predictions, test_targets)
+            rmse_results.append(split_rmse)
+            nll_results.append(split_nll)
+
+            print(f"Split {i+1} | RMSE: {split_rmse:.4f} | NLL: {split_nll:.4f}")
+            if args.wandb:
+                wandb.log({f'Split {i+1} RMSE': split_rmse, f'Split {i+1} NLL': split_nll})
         
-        #compute mean and std of RMSE and NLL across splits for the table TODO
-                
+        #compute mean and std of RMSE and NLL across splits for the table
+        mean_rmse, std_rmse = np.mean(rmse_results), np.std(rmse_results)
+        mean_nll, std_nll = np.mean(nll_results), np.std(nll_results)
+
+        print(f"FINAL RESULTS over {num_of_train_test_splits} splits:")
+        print(f"  RMSE : {mean_rmse:.4f} ± {std_rmse:.4f}")
+        print(f"  NLL  : {mean_nll:.4f}  ± {std_nll:.4f}")
+
+        if args.wandb:
+            wandb.log({'Mean RMSE': mean_rmse, 'Std RMSE': std_rmse, 'Mean NLL':  mean_nll,  'Std NLL':  std_nll})
 
 
 if __name__ == "__main__":
