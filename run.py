@@ -21,6 +21,9 @@ def main():
     parser.add_argument('--with_validation_set', action='store_true', default=False, help='Whether to use validation set or not.')
     parser.add_argument('--perform_ensemble_experiment', action='store_true', help='Whether to perform ensemble experiment or not.')
     parser.add_argument('--perform_mc_dropout_experiment', action='store_true', help='Whether to perform MC Dropout experiment or not.')
+    parser.add_argument('--augment', action='store_true', help='Whether to augment the training set or not.')
+    parser.add_argument('--type_of_augmentation', type=str, default="random", help='Whether to randomly or adversarially augment the training set.')
+    parser.add_argument('--augmentation_eps', type=int, default=0.01, help='Epsilon used during augmentation.')
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -28,7 +31,8 @@ def main():
     if args.wandb:
         wandb.init(name=args.run_name, config=vars(args), save_code=True)
         wandb.run.log_code(".")
- 
+
+    assert (not args.augment) or (args.augment and args.classification_or_regression == "classification"), "Augmentation currently implemented just for classification."
 
     OPTIMIZER = torch.optim.Adam
     LEARNING_RATE = 0.1
@@ -77,7 +81,11 @@ def main():
             optimizer = OPTIMIZER(model.parameters(), lr=LEARNING_RATE)
 
             print(f"Training ensemble model {i+1}.")
-            model = training_loop(model, train_loader, optimizer, CRITERION, NUMBER_OF_EPOCHS, device, args.wandb, val_loader=val_loader, model_save_path=f"models/{args.classification_or_regression}/{args.dataset}/model_{args.dataset}_{i+1}.pt")
+            if args.augment:
+                 model_save_path = f"models/{args.classification_or_regression}/{args.dataset}/model_{args.type_of_augmentation}_augmentation_{args.dataset}_{i+1}.pt"
+            else:
+                model_save_path = f"models/{args.classification_or_regression}/{args.dataset}/model_{args.dataset}_{i+1}.pt"
+            model = training_loop(model, train_loader, optimizer, CRITERION, NUMBER_OF_EPOCHS, device, args.wandb, val_loader=val_loader, model_save_path=model_save_path, augment=args.augment, type_of_augmentation=args.type_of_augmentation, augmentation_eps=args.augmentation_eps)
             
             print(f"Evaluating ensemble model {i+1}.")
             model.eval()

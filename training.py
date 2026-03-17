@@ -2,13 +2,27 @@
 import torch
 import wandb
 
-def training_loop(model, train_loader, optimizer, criterion, num_of_epochs, device, wandb_enabled=False, val_loader=None, model_save_path="models/model.pt"):
+from augmentation import generate_adversarially_augmented_samples, generate_randomly_augmented_samples
+
+def training_loop(model, train_loader, optimizer, criterion, num_of_epochs, device, wandb_enabled=False, val_loader=None, model_save_path="models/model.pt", augment=False, type_of_augmentation="random", augmentation_eps = 0.01):
+    
+    if augment and type_of_augmentation not in ["random", "adversarial"]:
+        raise ValueError("Invalid augmentation type. It should be random or adversarial.")
+    
     for epoch in range(num_of_epochs):
         model.train()
         train_loss = 0
         for batch_x, batch_y  in train_loader:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             optimizer.zero_grad()
+            if augment:
+                if type_of_augmentation == "adversarial":
+                    batch_augmented_x = generate_adversarially_augmented_samples(model, criterion, batch_x, batch_y, eps=augmentation_eps)
+                elif type_of_augmentation == "random":
+                    batch_augmented_x = generate_randomly_augmented_samples(batch_x, eps=augmentation_eps)
+                batch_x = torch.cat((batch_x, batch_augmented_x), dim=0)
+                batch_y = torch.cat((batch_y, batch_y), dim=0)
+                optimizer.zero_grad()
             output = model(batch_x)
             loss = criterion(output, batch_y)
             train_loss += loss.item()
