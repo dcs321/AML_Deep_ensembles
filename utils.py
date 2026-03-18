@@ -21,12 +21,22 @@ def load_saved_ensemble(model_paths, device):
     return ensemble
 
 def get_mnist_checkpoint_paths():
-    ensemble_paths = [
-        f"models/classification/mnist/model_mnist_{i}.pt"
-        for i in range(1, 16)
-    ]
-    mc_dropout_path = "models/classification/mnist/model_mnist_mc_dropout.pt"
-    return ensemble_paths, mc_dropout_path
+    checkpoint_paths = {
+        "ensemble": [
+            f"models/classification/mnist/model_mnist_{i}.pt"
+            for i in range(1, 16)
+        ],
+        "ensemble_random": [
+            f"models/classification/mnist/model_random_augmentation_mnist_{i}.pt"
+            for i in range(1, 16)
+        ],
+        "ensemble_adversarial": [
+            f"models/classification/mnist/model_adversarial_augmentation_mnist_{i}.pt"
+            for i in range(1, 16)
+        ],
+        "mc_dropout": "models/classification/mnist/model_mnist_mc_dropout.pt",
+    }
+    return checkpoint_paths
 
 # Figure 3
 
@@ -36,30 +46,37 @@ def compute_entropy_comparison_results(
     device,
     ensemble_sizes=(1, 5, 10),
 ):
-    ensemble_paths, mc_dropout_path = get_mnist_checkpoint_paths()
+    checkpoint_paths = get_mnist_checkpoint_paths()
 
     experiment_results = {}
 
+    ensemble_methods = {
+      "ensemble": checkpoint_paths["ensemble"],
+      "ensemble_random": checkpoint_paths["ensemble_random"],
+      "ensemble_adversarial": checkpoint_paths["ensemble_adversarial"],
+    }
+
     # ---------- Ensembles ----------
-    for M in ensemble_sizes:
-        print(f"Running Ensemble M={M}")
-        ensemble_model = load_saved_ensemble(ensemble_paths[:M], device)
+    for method_name, model_paths in ensemble_methods.items():
+        for M in ensemble_sizes:
+            print(f"Running {method_name} M={M}")
+            ensemble_model = load_saved_ensemble(model_paths[:M], device)
 
-        mnist_probs, _ = get_predictions_and_targets(ensemble_model, mnist_test_loader, device)
-        notmnist_probs, _ = get_predictions_and_targets(ensemble_model, notmnist_loader, device)
+            mnist_probs, _ = get_predictions_and_targets(ensemble_model, mnist_test_loader, device)
+            notmnist_probs, _ = get_predictions_and_targets(ensemble_model, notmnist_loader, device)
 
-        mnist_entropy = compute_predictive_entropy(mnist_probs).cpu()
-        notmnist_entropy = compute_predictive_entropy(notmnist_probs).cpu()
+            mnist_entropy = compute_predictive_entropy(mnist_probs).cpu()
+            notmnist_entropy = compute_predictive_entropy(notmnist_probs).cpu()
 
-        experiment_results[("ensemble", M)] = {
-            "mnist_entropy": mnist_entropy,
-            "notmnist_entropy": notmnist_entropy,
-            "mnist_mean": mnist_entropy.mean().item(),
-            "notmnist_mean": notmnist_entropy.mean().item(),
-        }
+            experiment_results[(method_name, M)] = {
+                "mnist_entropy": mnist_entropy,
+                "notmnist_entropy": notmnist_entropy,
+                "mnist_mean": mnist_entropy.mean().item(),
+                "notmnist_mean": notmnist_entropy.mean().item(),
+            }
 
     # ---------- MC Dropout ----------
-    mc_model = load_saved_model(mc_dropout_path, device)
+    mc_model = load_saved_model(checkpoint_paths["mc_dropout"], device)
 
     for M in ensemble_sizes:
         print(f"Running MC Dropout M={M}")
@@ -120,29 +137,38 @@ def compute_confidence_comparison_results(
     if thresholds is None:
         thresholds = [round(x, 1) for x in torch.arange(0.0, 1.0, 0.1).tolist()]
 
-    ensemble_paths, mc_dropout_path = get_mnist_checkpoint_paths()
+    checkpoint_paths = get_mnist_checkpoint_paths()
 
     experiment_results = {}
 
+    ensemble_methods = {
+        "ensemble": checkpoint_paths["ensemble"],
+        "ensemble_random": checkpoint_paths["ensemble_random"],
+        "ensemble_adversarial": checkpoint_paths["ensemble_adversarial"],
+    }
+
     # ---------- Ensembles ----------
-    ensemble_model = load_saved_ensemble(ensemble_paths[:ensemble_size], device)
+    for method_name, model_paths in ensemble_methods.items():
+        print(f"Running {method_name} for Figure 6 with M={ensemble_size}")
+        ensemble_model = load_saved_ensemble(model_paths[:ensemble_size], device)
 
-    mnist_probs, mnist_targets = get_predictions_and_targets(ensemble_model, mnist_test_loader, device)
-    notmnist_probs, notmnist_targets = get_predictions_and_targets(ensemble_model, notmnist_loader, device)
+        mnist_probs, mnist_targets = get_predictions_and_targets(ensemble_model, mnist_test_loader, device)
+        notmnist_probs, notmnist_targets = get_predictions_and_targets(ensemble_model, notmnist_loader, device)
 
-    mixed_probs = torch.cat([mnist_probs.cpu(), notmnist_probs.cpu()], dim=0)
-    mixed_targets = torch.cat(
-        [mnist_targets.cpu(), torch.full_like(notmnist_targets.cpu(), -1)],
-        dim=0
-    )
+        mixed_probs = torch.cat([mnist_probs.cpu(), notmnist_probs.cpu()], dim=0)
+        mixed_targets = torch.cat(
+            [mnist_targets.cpu(), torch.full_like(notmnist_targets.cpu(), -1)],
+            dim=0
+        )
 
-    experiment_results["ensemble"] = compute_accuracy_vs_confidence_curve(
-        mixed_probs, mixed_targets, thresholds
-    )
+        experiment_results[method_name] = compute_accuracy_vs_confidence_curve(
+            mixed_probs, mixed_targets, thresholds
+        )
 
     # ---------- MC Dropout ----------
-    mc_model = load_saved_model(mc_dropout_path, device)
+    mc_model = load_saved_model(checkpoint_paths["mc_dropout"], device)
 
+    print(f"Running mc_dropout for Figure 6 with M={ensemble_size}")
     mnist_probs_mc, mnist_targets_mc = get_predictions_and_targets_mc_dropout(
         mc_model, mnist_test_loader, device, ensemble_size
     )

@@ -30,51 +30,38 @@ def plot_entropy_comparison(experiment_results, ensemble_sizes=(1, 5, 10),
         10: "#cb181d"
     }
 
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
+    method_order = [
+        ("ensemble", "Ensemble"),
+        ("ensemble_random", "Ensemble + R"),
+        ("ensemble_adversarial", "Ensemble + AT"),
+        ("mc_dropout", "MC dropout 0.1"),
+    ]
+
+    fig, axes = plt.subplots(2, 4, figsize=(16, 8), sharex=True)
 
     # ---------- MNIST ----------
-    for M in ensemble_sizes:
-        x, y = smooth_hist_line(
-            experiment_results[("ensemble", M)]["mnist_entropy"].numpy(),
-            bins=70,
-            value_range=(-0.5, 2.0),
-            smooth=True
-        )
-        axes[0, 0].plot(x, y, color=blue_colors[M], linewidth=2)
-
-    for M in ensemble_sizes:
-        x, y = smooth_hist_line(
-            experiment_results[("mc_dropout", M)]["mnist_entropy"].numpy(),
-            bins=70,
-            value_range=(-0.5, 2.0),
-            smooth=True
-        )
-        axes[0, 1].plot(x, y, color=blue_colors[M], linewidth=2)
+    for col, (method_key, title) in enumerate(method_order):
+        for M in ensemble_sizes:
+            x, y = smooth_hist_line(
+                experiment_results[(method_key, M)]["mnist_entropy"].numpy(),
+                bins=70,
+                value_range=(-0.5, 2.0),
+                smooth=True
+            )
+            axes[0, col].plot(x, y, color=blue_colors[M], linewidth=2)
+        axes[0, col].set_title(title)
 
     # ---------- NotMNIST ----------
-    for M in ensemble_sizes:
-        x, y = smooth_hist_line(
-            experiment_results[("ensemble", M)]["notmnist_entropy"].numpy(),
-            bins=70,
-            value_range=(-0.5, 2.0),
-            smooth=True
-        )
-        axes[1, 0].plot(x, y, color=red_colors[M], linewidth=2)
-
-    for M in ensemble_sizes:
-        x, y = smooth_hist_line(
-            experiment_results[("mc_dropout", M)]["notmnist_entropy"].numpy(),
-            bins=70,
-            value_range=(-0.5, 2.0),
-            smooth=True
-        )
-        axes[1, 1].plot(x, y, color=red_colors[M], linewidth=2)
-
-    # Titles
-    axes[0, 0].set_title("Ensemble")
-    axes[0, 1].set_title("MC dropout")
-    axes[1, 0].set_title("Ensemble")
-    axes[1, 1].set_title("MC dropout")
+    for col, (method_key, title) in enumerate(method_order):
+        for M in ensemble_sizes:
+            x, y = smooth_hist_line(
+                experiment_results[(method_key, M)]["notmnist_entropy"].numpy(),
+                bins=70,
+                value_range=(-0.5, 2.0),
+                smooth=True
+            )
+            axes[1, col].plot(x, y, color=red_colors[M], linewidth=2)
+        axes[1, col].set_title(title)
 
     # Labels
     for ax in axes.flat:
@@ -82,7 +69,7 @@ def plot_entropy_comparison(experiment_results, ensemble_sizes=(1, 5, 10),
         ax.set_xlim(-0.5, 2.0)
 
     for ax in axes[0]:
-      ax.tick_params(axis='x', labelbottom=True)
+        ax.tick_params(axis='x', labelbottom=True)
 
     axes[0, 0].set_ylabel("Known classes")
     axes[1, 0].set_ylabel("Unknown classes")
@@ -91,16 +78,13 @@ def plot_entropy_comparison(experiment_results, ensemble_sizes=(1, 5, 10),
     top_handles = [Line2D([0], [0], color=blue_colors[M], lw=2, label=str(M)) for M in ensemble_sizes]
     bottom_handles = [Line2D([0], [0], color=red_colors[M], lw=2, label=str(M)) for M in ensemble_sizes]
 
-    axes[0, 0].legend(handles=top_handles, frameon=False)
-    axes[0, 1].legend(handles=top_handles, frameon=False)
-    axes[1, 0].legend(handles=bottom_handles, frameon=False)
-    axes[1, 1].legend(handles=bottom_handles, frameon=False)
+    for col in range(4):
+        axes[0, col].legend(handles=top_handles, frameon=False, loc="upper right")
+        axes[1, col].legend(handles=bottom_handles, frameon=False, loc="upper right")
 
-    # Limits
-    axes[0, 0].set_ylim(0, 9)
-    axes[0, 1].set_ylim(0, 9)
-    axes[1, 0].set_ylim(0, 7)
-    axes[1, 1].set_ylim(0, 7)
+    for col in range(4):
+        axes[0, col].set_ylim(0, 14)
+        axes[1, col].set_ylim(0, 14)
 
     plt.suptitle("Predictive Entropy Histograms", y=1.02)
     plt.tight_layout()
@@ -114,25 +98,23 @@ def plot_accuracy_vs_confidence(
 ):
     fig, ax = plt.subplots(figsize=(7, 5))
 
-    ax.plot(
-        experiment_results["ensemble"]["thresholds"],
-        experiment_results["ensemble"]["accuracies"],
-        marker="o",
-        linewidth=2,
-        markersize=4,
-        label="Ensemble",
-        color="red",
-    )
+    method_styles = {
+        "ensemble": {"label": "Ensemble", "color": "red"},
+        "ensemble_random": {"label": "Ensemble + R", "color": "gray"},
+        "ensemble_adversarial": {"label": "Ensemble + AT", "color": "blue"},
+        "mc_dropout": {"label": "MC dropout", "color": "limegreen"},
+    }
 
-    ax.plot(
-        experiment_results["mc_dropout"]["thresholds"],
-        experiment_results["mc_dropout"]["accuracies"],
-        marker="o",
-        linewidth=2,
-        markersize=4,
-        label="MC dropout",
-        color="limegreen",
-    )
+    for method_key, style in method_styles.items():
+        ax.plot(
+            experiment_results[method_key]["thresholds"],
+            experiment_results[method_key]["accuracies"],
+            marker="o",
+            linewidth=2,
+            markersize=4,
+            label=style["label"],
+            color=style["color"],
+        )
 
     ax.set_xlabel(r"Confidence Threshold $\tau$")
     ax.set_ylabel(r"Accuracy on examples $p(y|x) \geq \tau$")
