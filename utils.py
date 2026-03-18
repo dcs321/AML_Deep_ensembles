@@ -23,18 +23,18 @@ def load_saved_ensemble(model_paths, device):
 def get_mnist_checkpoint_paths():
     checkpoint_paths = {
         "ensemble": [
-            f"models/classification/mnist/model_mnist_{i}.pt"
+            f"models/classification/mnist/epoch20/model_mnist_{i}.pt"
             for i in range(1, 16)
         ],
         "ensemble_random": [
-            f"models/classification/mnist/model_random_augmentation_mnist_{i}.pt"
+            f"models/classification/mnist/epoch20/model_random_augmentation_mnist_{i}.pt"
             for i in range(1, 16)
         ],
         "ensemble_adversarial": [
-            f"models/classification/mnist/model_adversarial_augmentation_mnist_{i}.pt"
+            f"models/classification/mnist/epoch20/model_adversarial_augmentation_mnist_{i}.pt"
             for i in range(1, 16)
         ],
-        "mc_dropout": "models/classification/mnist/model_mnist_mc_dropout.pt",
+        "mc_dropout": "models/classification/mnist/epoch20/model_mnist_mc_dropout.pt",
     }
     return checkpoint_paths
 

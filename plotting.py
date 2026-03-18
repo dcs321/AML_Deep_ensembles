@@ -14,6 +14,7 @@ def smooth_hist_line(values, bins=60, value_range=(-0.5, 2.1), smooth=False):
 
     return centers, hist
 
+
 # Figure 3
 def plot_entropy_comparison(experiment_results, ensemble_sizes=(1, 5, 10),
   save_path="plots/figure3_style_partial_replication.png"):
@@ -44,7 +45,7 @@ def plot_entropy_comparison(experiment_results, ensemble_sizes=(1, 5, 10),
         for M in ensemble_sizes:
             x, y = smooth_hist_line(
                 experiment_results[(method_key, M)]["mnist_entropy"].numpy(),
-                bins=70,
+                bins=100,
                 value_range=(-0.5, 2.0),
                 smooth=True
             )
@@ -56,7 +57,7 @@ def plot_entropy_comparison(experiment_results, ensemble_sizes=(1, 5, 10),
         for M in ensemble_sizes:
             x, y = smooth_hist_line(
                 experiment_results[(method_key, M)]["notmnist_entropy"].numpy(),
-                bins=70,
+                bins=100,
                 value_range=(-0.5, 2.0),
                 smooth=True
             )
