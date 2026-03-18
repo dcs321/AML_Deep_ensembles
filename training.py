@@ -17,7 +17,9 @@ def training_loop(model, train_loader, optimizer, criterion, num_of_epochs, devi
             optimizer.zero_grad()
             if augment:
                 if type_of_augmentation == "adversarial":
+                    model.eval()
                     batch_augmented_x = generate_adversarially_augmented_samples(model, criterion, batch_x, batch_y, eps=augmentation_eps)
+                    model.train()
                 elif type_of_augmentation == "random":
                     batch_augmented_x = generate_randomly_augmented_samples(batch_x, eps=augmentation_eps)
                 optimizer.zero_grad()
