@@ -35,10 +35,10 @@ def main():
     assert (not args.augment) or (args.augment and args.classification_or_regression == "classification"), "Augmentation currently implemented just for classification."
 
     OPTIMIZER = torch.optim.Adam
-    LEARNING_RATE = 0.1
+    LEARNING_RATE = 0.001
 
     if args.classification_or_regression == "classification": #CLASSIFICATION
-        NUMBER_OF_EPOCHS = 10
+        NUMBER_OF_EPOCHS = 20
         CRITERION = torch.nn.CrossEntropyLoss()
 
         MODEL = ClassificationModel

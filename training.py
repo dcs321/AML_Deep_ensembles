@@ -20,11 +20,13 @@ def training_loop(model, train_loader, optimizer, criterion, num_of_epochs, devi
                     batch_augmented_x = generate_adversarially_augmented_samples(model, criterion, batch_x, batch_y, eps=augmentation_eps)
                 elif type_of_augmentation == "random":
                     batch_augmented_x = generate_randomly_augmented_samples(batch_x, eps=augmentation_eps)
-                batch_x = torch.cat((batch_x, batch_augmented_x), dim=0)
-                batch_y = torch.cat((batch_y, batch_y), dim=0)
                 optimizer.zero_grad()
             output = model(batch_x)
             loss = criterion(output, batch_y)
+            if augment:
+                output_augmented = model(batch_augmented_x)
+                loss_augmented = criterion(output_augmented, batch_y)
+                loss = loss + loss_augmented
             train_loss += loss.item()
             loss.backward()
             optimizer.step()
