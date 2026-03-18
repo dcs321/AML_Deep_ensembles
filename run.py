@@ -4,7 +4,7 @@ import torch
 import numpy as np
 
 from models import ClassificationModel, ClassificationEnsemble, ClassificationMCDropoutModel, RegressionModel, RegressionEnsemble
-from data import load_mnist, load_boston_housing
+from data import load_mnist, load_boston_housing, load_concrete, load_energy
 from training import training_loop
 from evaluation import get_predictions_and_targets, compute_negative_log_likelihood, compute_brier_score, compute_classification_error, get_predictions_and_targets_mc_dropout, nll_criterion_regression, get_predictions_and_targets_rescaled, compute_rmse_regression, compute_nll_regression
 
@@ -68,6 +68,15 @@ def main():
         if args.dataset == "boston_housing":
             input_dims = 13
             train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_boston_housing(num_of_train_test_splits, train_ratio_in_split)
+        elif args.dataset == "concrete":
+            input_dims = 8
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_concrete(num_of_train_test_splits, train_ratio_in_split)
+        elif args.dataset == "energy":
+            input_dims = 8
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_energy(num_of_train_test_splits, train_ratio_in_split)
+        else:
+            raise ValueError(f"Dataset {args.dataset} is not supported for regression.")
+            
         assert output_dims == 1, "Only 1-dimension output is supported for regression"
     else:
         raise ValueError("Only classification and regression are supported.")
