@@ -66,23 +66,17 @@ def load_notmnist(batch_size=100, root='./datasets/classification/notMNIST_small
 
 #REGRESSION
 
-def load_boston_housing(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
-    # TODO
-    data_url = "http://lib.stat.cmu.edu/datasets/boston"
-    raw_df = pd.read_csv(data_url, sep=r"\s+", skiprows=22, header=None)
-    X = np.hstack([raw_df.values[::2, :], raw_df.values[1::2, :2]])
-    y = raw_df.values[1::2, 2]
-
+def data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size):
     n_samples = len(X)
     rng = np.random.RandomState(42)
-    n_train   = int(np.floor(train_ratio_in_split * n_samples))
     train_loaders = [] 
     test_loaders = [] 
-    output_means = [] 
+    output_means = []
     output_stds = []
 
     for _ in range(num_of_train_test_splits):
-        perm      = rng.permutation(n_samples)
+        perm = rng.permutation(n_samples)
+        n_train = int(np.floor(train_ratio_in_split * n_samples))
         train_idx = perm[:n_train]
         test_idx  = perm[n_train:]
 
@@ -91,11 +85,11 @@ def load_boston_housing(num_of_train_test_splits, train_ratio_in_split, batch_si
 
         X_mean, X_std = X_train.mean(axis=0), X_train.std(axis=0)
         X_train_n = ((X_train - X_mean) / (X_std + 1e-8)).astype(np.float32)
-        X_test_n  = ((X_test  - X_mean) / (X_std + 1e-8)).astype(np.float32)
+        X_test_n = ((X_test  - X_mean) / (X_std + 1e-8)).astype(np.float32)
 
         y_mean, y_std = float(y_train.mean()), float(y_train.std())
         y_train_n = ((y_train - y_mean) / y_std).astype(np.float32)
-        y_test_n  = ((y_test  - y_mean) / y_std).astype(np.float32)
+        y_test_n = ((y_test  - y_mean) / y_std).astype(np.float32)
 
         train_loaders.append(DataLoader(TensorDataset(torch.from_numpy(X_train_n), torch.from_numpy(y_train_n)), batch_size=batch_size, shuffle=True))
         test_loaders.append( DataLoader(TensorDataset(torch.from_numpy(X_test_n),  torch.from_numpy(y_test_n)),  batch_size=batch_size, shuffle=False))
@@ -103,3 +97,32 @@ def load_boston_housing(num_of_train_test_splits, train_ratio_in_split, batch_si
         output_stds.append(y_std)
 
     return train_loaders, test_loaders, output_means, output_stds
+
+
+def load_boston_housing(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    
+    data_url = "http://lib.stat.cmu.edu/datasets/boston"
+    raw_df = pd.read_csv(data_url, sep=r"\s+", skiprows=22, header=None)
+    X = np.hstack([raw_df.values[::2, :], raw_df.values[1::2, :2]])
+    y = raw_df.values[1::2, 2]
+    return _make_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+
+
+def load_concrete(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    
+    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/concrete/compressive/Concrete_Data.xls"
+    df = pd.read_excel(url, header=0)
+    data = df.values.astype(np.float64)
+    X, y = data[:, :-1], data[:, -1]
+    return _make_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+
+
+def load_energy(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    
+    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/00242/ENB2012_data.xlsx"
+    df = pd.read_excel(url, header=0)
+    data = df.values.astype(np.float64)
+    X, y = data[:, :8], data[:, 8]  
+    return _make_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+
+
