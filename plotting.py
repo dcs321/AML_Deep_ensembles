@@ -127,3 +127,40 @@ def plot_accuracy_vs_confidence(
     plt.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.show()
 
+# qualitative analysis
+def plot_qualitative_examples_grid(
+    images,
+    pred_labels,
+    top_indices,
+    bottom_indices,
+    # title,
+    save_path,
+):
+    top_indices = top_indices.tolist()
+    bottom_indices = bottom_indices.tolist()
+
+    ordered_indices = top_indices + bottom_indices
+
+    fig, axes = plt.subplots(4, 10, figsize=(12, 4.8))
+
+    for i, idx in enumerate(ordered_indices):
+        row = i // 10
+        col = i % 10
+
+        ax = axes[row, col]
+        ax.imshow(images[idx].squeeze(), cmap="gray")
+        ax.axis("off")
+        ax.set_title(str(int(pred_labels[idx])), fontsize=6, pad=1)
+
+    plt.subplots_adjust(
+        left=0.01,
+        right=0.99,
+        top=0.96,
+        bottom=0.04,
+        wspace=0.02,
+        hspace=0.10
+    )
+
+    plt.tight_layout(rect=[0.04, 0.03, 1, 0.95])
+    plt.savefig(save_path, dpi=200, bbox_inches="tight")
+    plt.show()

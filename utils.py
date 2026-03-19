@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from evaluation import (
     get_predictions_and_targets,
     get_predictions_and_targets_mc_dropout,
@@ -187,5 +188,112 @@ def compute_confidence_comparison_results(
     )
 
     return experiment_results
+
+# qualitative analysis
+
+def collect_ensemble_member_predictions(models, data_loader, device):
+    all_images = []
+    all_targets = []
+    member_outputs = [[] for _ in range(len(models))]
+
+    with torch.no_grad():
+        for batch_x, batch_y in data_loader:
+            batch_x_device = batch_x.to(device)
+
+            all_images.append(batch_x.cpu())
+            all_targets.append(batch_y.cpu())
+
+            for i, model in enumerate(models):
+                logits = model(batch_x_device)
+                probs = F.softmax(logits, dim=1).cpu()
+                member_outputs[i].append(probs)
+
+    images = torch.cat(all_images, dim=0)
+    targets = torch.cat(all_targets, dim=0)
+
+    member_probs = torch.stack(
+        [torch.cat(member_outputs[i], dim=0) for i in range(len(models))],
+        dim=0
+    )  # [M, N, C]
+
+    ensemble_probs = member_probs.mean(dim=0)  # [N, C]
+    pred_labels = ensemble_probs.argmax(dim=1)
+    confidence = ensemble_probs.max(dim=1).values
+
+    return {
+        "images": images,
+        "targets": targets,
+        "member_probs": member_probs,
+        "ensemble_probs": ensemble_probs,
+        "pred_labels": pred_labels,
+        "confidence": confidence,
+    }
+
+
+def compute_disagreement_scores(member_probs, ensemble_probs):
+    member_probs = member_probs.clamp_min(1e-9)
+    ensemble_probs = ensemble_probs.clamp_min(1e-9)
+
+    log_member = member_probs.log()
+    log_ensemble = ensemble_probs.unsqueeze(0).log()
+
+    kl = (member_probs * (log_member - log_ensemble)).sum(dim=-1)  # [M, N]
+    disagreement = kl.mean(dim=0)  # [N]
+
+    return disagreement
+
+
+def get_extreme_indices(scores, num_each=20):
+    sorted_indices = torch.argsort(scores)
+    lowest = sorted_indices[:num_each]
+    highest = sorted_indices[-num_each:]
+    return lowest, highest
+
+def get_class_balanced_extreme_indices(scores, targets, num_per_class=2, descending=False):
+    selected_indices = []
+
+    class_labels = torch.unique(targets).tolist()
+    class_labels = sorted(int(c) for c in class_labels)
+
+    for c in class_labels:
+        class_mask = (targets == c)
+        class_indices = torch.where(class_mask)[0]
+        class_scores = scores[class_indices]
+
+        order = torch.argsort(class_scores, descending=descending)
+        chosen = class_indices[order[:num_per_class]]
+        selected_indices.append(chosen)
+
+    return torch.cat(selected_indices, dim=0)
+
+def prepare_qualitative_uncertainty_results(
+    data_loader,
+    device,
+    method_key="ensemble",
+    ensemble_size=10,
+):
+    checkpoint_paths = get_mnist_checkpoint_paths()
+
+    method_to_paths = {
+        "ensemble": checkpoint_paths["ensemble"],
+        "ensemble_random": checkpoint_paths["ensemble_random"],
+        "ensemble_adversarial": checkpoint_paths["ensemble_adversarial"],
+    }
+
+    model_paths = method_to_paths[method_key][:ensemble_size]
+    models = [load_saved_model(p, device) for p in model_paths]
+    # debug
+    print(len(models))
+    print(type(models[0]))
+
+    results = collect_ensemble_member_predictions(models, data_loader, device)
+    disagreement = compute_disagreement_scores(
+        results["member_probs"],
+        results["ensemble_probs"]
+    )
+
+    results["disagreement"] = disagreement
+    return results
+
 
 
