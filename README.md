@@ -64,6 +64,12 @@ python run.py --wandb --run_name mnist_mc_dropout_experiment --dataset mnist --c
 
 ## Regression
 
+Train deep ensembles on the regression datasets:
+
+```bash
+python run.py --wandb --run_name regression_ensemble_energy --dataset energy --classification_or_regression regression  --number_of_models 5
+```
+
 ## References
 
 [1] Lakshminarayanan, Balaji, Alexander Pritzel, and Charles Blundell. "Simple and scalable predictive uncertainty estimation using deep ensembles." Advances in neural information processing systems 30 (2017).
