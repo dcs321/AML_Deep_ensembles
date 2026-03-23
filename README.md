@@ -1,6 +1,6 @@
 # AML - Uncertainty Estimation For Deep Ensembles
 
-This is the repository for the "MLMI4: Advanced Machine Learning" coursework of Group 6 on reproducing the results of the "Simple and scalable predictive uncertainty estimation using deep ensembles" paper [1].
+This is the repository for the "MLMI4: Advanced Machine Learning" coursework of Group 6 on reproducing the results of the "Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles" paper [1].
 
 ## Installation
 
