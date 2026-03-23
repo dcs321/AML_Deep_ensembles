@@ -4,7 +4,7 @@ import torch
 import numpy as np
 
 from models import ClassificationModel, ClassificationEnsemble, ClassificationMCDropoutModel, RegressionModel, RegressionEnsemble
-from data import load_mnist, load_boston_housing, load_concrete, load_energy
+from data import load_mnist, load_boston_housing, load_concrete, load_energy, load_kin8nm, load_naval, load_power_plant, load_wine, load_yacht, load_protein, load_year_msd
 from training import training_loop
 from evaluation import get_predictions_and_targets, compute_negative_log_likelihood, compute_brier_score, compute_classification_error, get_predictions_and_targets_mc_dropout, nll_criterion_regression, get_predictions_and_targets_rescaled, compute_rmse_regression, compute_nll_regression
 
@@ -74,6 +74,32 @@ def main():
         elif args.dataset == "energy":
             input_dims = 8
             train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_energy(num_of_train_test_splits, train_ratio_in_split)
+        elif args.dataset == "kin8nm":
+            input_dims = 8
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_kin8nm(num_of_train_test_splits, train_ratio_in_split)
+        elif args.dataset == "naval":
+            input_dims = 16
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_naval(num_of_train_test_splits, train_ratio_in_split)
+        elif args.dataset == "power_plant":
+            input_dims = 4
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_power_plant(num_of_train_test_splits, train_ratio_in_split)
+        elif args.dataset == "wine":
+            input_dims = 11
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_wine(num_of_train_test_splits, train_ratio_in_split)
+        elif args.dataset == "yacht":
+            input_dims = 6
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_yacht(num_of_train_test_splits, train_ratio_in_split)
+        elif args.dataset == "protein":
+            input_dims = 9
+            num_of_train_test_splits = 5
+            hidden_dims = 100
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_protein(num_of_train_test_splits, train_ratio_in_split)
+        elif args.dataset == "year_msd":
+            input_dims = 90
+            num_of_train_test_splits = 1
+            hidden_dims = 100
+            LEARNING_RATE = 0.001
+            train_loaders, test_loaders, output_means_for_standardization, output_stds_for_standardization = load_year_msd(num_of_train_test_splits, train_ratio_in_split)
         else:
             raise ValueError(f"Dataset {args.dataset} is not supported for regression.")
             

@@ -4,7 +4,11 @@ import numpy as np
 import pandas as pd
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, TensorDataset
-
+import urllib.request
+from scipy.io import arff
+import kagglehub
+import os
+import zipfile
 
 from PIL import Image, UnidentifiedImageError
 
@@ -105,7 +109,7 @@ def load_boston_housing(num_of_train_test_splits, train_ratio_in_split, batch_si
     raw_df = pd.read_csv(data_url, sep=r"\s+", skiprows=22, header=None)
     X = np.hstack([raw_df.values[::2, :], raw_df.values[1::2, :2]])
     y = raw_df.values[1::2, 2]
-    return _make_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
 
 
 def load_concrete(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
@@ -114,7 +118,7 @@ def load_concrete(num_of_train_test_splits, train_ratio_in_split, batch_size=100
     df = pd.read_excel(url, header=0)
     data = df.values.astype(np.float64)
     X, y = data[:, :-1], data[:, -1]
-    return _make_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
 
 
 def load_energy(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
@@ -123,6 +127,97 @@ def load_energy(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
     df = pd.read_excel(url, header=0)
     data = df.values.astype(np.float64)
     X, y = data[:, :8], data[:, 8]  
-    return _make_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+
+def load_kin8nm(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    url = "https://www.openml.org/data/download/3626/dataset_2175_kin8nm.arff"
+    file_path = "datasets/regression/kin8nm.arff"
+
+    urllib.request.urlretrieve(url, file_path)
+    raw_data, _ = arff.loadarff(file_path)
+    df = pd.DataFrame(raw_data)
+    data = df.values.astype(np.float64)
+    
+    X, y = data[:, :-1], data[:, -1]
+    
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+
+def load_naval(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    url = kagglehub.dataset_download("elikplim/maintenance-of-naval-propulsion-plants-data-set")
+    file_path = os.path.join(url, "navalplantmaintenance.csv")
+
+    df = pd.read_csv(file_path, sep=r"\s+", header=None)
+    data = df.values.astype(np.float64)
+
+    X = data[:, :-2]
+    y = data[:, -2]
+
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
 
 
+def load_power_plant(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    url = kagglehub.dataset_download("rinichristy/combined-cycle-power-plant-data-set-uci-data")
+    file_path = os.path.join(url, "Power Plant Data.csv")
+
+    df = pd.read_csv(file_path)
+    data = df.values.astype(np.float64)
+
+    X = data[:, :-1] 
+    y = data[:, -1]  
+
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+
+def load_wine(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    url = kagglehub.dataset_download("uciml/red-wine-quality-cortez-et-al-2009")
+    file_path = os.path.join(url, "winequality-red.csv")
+
+    df = pd.read_csv(file_path)
+    data = df.values.astype(np.float64)
+
+    X = data[:, :-1] 
+    y = data[:, -1]  
+
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+
+def load_yacht(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    url = kagglehub.dataset_download("heitornunes/yacht-hydrodynamics-data-set")
+    file_path = os.path.join(url, "yacht_hydro.csv")
+
+    df = pd.read_csv(file_path)
+    data = df.values.astype(np.float64)
+
+    X = data[:, :-1]
+    y = data[:, -1]
+
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+
+
+def load_protein(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    url = kagglehub.dataset_download("samanemami/properties-of-protein-tertiary-structure")
+    file_path = os.path.join(url, "protein.csv")
+
+    df = pd.read_csv(file_path)
+    data = df.values.astype(np.float64)
+
+    y = data[:, 0]
+    X = data[:, 1:]
+
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
+
+def load_year_msd(num_of_train_test_splits, train_ratio_in_split, batch_size=100):
+    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/00203/YearPredictionMSD.txt.zip"
+    zip_path = "datasets/regression/year.zip"
+    file_path = "datasets/regression/YearPredictionMSD.txt"
+
+    urllib.request.urlretrieve(url, zip_path)
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall("datasets/regression/")
+    os.remove(zip_path)
+
+    df = pd.read_csv(file_path, header=None)
+    data = df.values.astype(np.float64)
+
+    y = data[:, 0]
+    X = data[:, 1:]
+
+    return data_loaders(X, y, num_of_train_test_splits, train_ratio_in_split, batch_size)
